@@ -246,12 +246,8 @@
 <!-- 花瓣背景 -->
 <canvas id="petal-canvas"></canvas>
 
-<!-- 背景音乐（免版权，使用 pixabay 的 free music CDN） -->
-<audio id="bg-music" loop preload="auto">
-  <!-- River Flows in You — Yiruma (免版权 from Pixabay) -->
-  <source src="https://cdn.pixabay.com/download/audio/2022/03/09/audio_19671da2b6.mp3?filename=river-flows-in-you-yiruma-30sec-110699.mp3" type="audio/mpeg" />
-  <source src="https://cdn.pixabay.com/download/audio/2022/03/09/audio_19671da2b6.mp3?filename=river-flows-in-you-yiruma-30sec-110699.mp3" type="audio/mp3" />
-</audio>
+<!-- YouTube IFrame API for background music -->
+<div id="yt-player" style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;top:-9999px;left:-9999px;" allow="autoplay"></div>
 
 <!-- 音乐开关 -->
 <button id="music-btn" title="播放/暂停音乐">🎵</button>
@@ -406,39 +402,76 @@
   }
   loop();
 
-  /* ── 音乐控制 ── */
-  const audio = document.getElementById('bg-music');
-  const btn   = document.getElementById('music-btn');
-  let   playing = false;
+  /* ── YouTube 音乐播放器 ── */
+  let ytPlayer = null;
+  let ytPlaying = false;
 
-  audio.volume = 0.45;
+  // River Flows in You 钢琴版（免版权 YouTube 视频）
+  const YT_VIDEO_ID = 'Km__9F3R0_A'; // Piano Romantic Collection
+
+  function onYouTubeIframeAPIReady() {
+    ytPlayer = new YT.Player('yt-player', {
+      videoId: YT_VIDEO_ID,
+      playerVars: {
+        autoplay: 1,
+        loop: 1,
+        playlist: YT_VIDEO_ID,
+        modestbranding: 1,
+        controls: 0,
+        showinfo: 0,
+        rel: 0,
+        fs: 0,
+        playsinline: 1,
+        mute: 1   // 先静音，绕过自动播放限制
+      },
+      events: {
+        onReady: function(event) {
+          event.target.setVolume(45);
+          event.target.playVideo();
+          ytPlaying = true;
+          btn.textContent = '🎶';
+          btn.classList.add('playing');
+        },
+        onStateChange: function(event) {
+          if (event.data === YT.PlayerState.ENDED) {
+            ytPlayer.playVideo();
+          }
+        }
+      }
+    });
+  }
+
+  // 加载 YouTube IFrame API
+  var tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  var firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+  const btn = document.getElementById('music-btn');
 
   btn.addEventListener('click', () => {
-    if (playing) {
-      audio.pause();
+    if (!ytPlayer || !ytPlayer.getPlayerState) return;
+    const state = ytPlayer.getPlayerState();
+    if (state === YT.PlayerState.PLAYING) {
+      ytPlayer.pauseVideo();
+      ytPlaying = false;
       btn.textContent = '🎵';
       btn.classList.remove('playing');
     } else {
-      audio.play().then(() => {
-        btn.textContent = '🎶';
-        btn.classList.add('playing');
-      }).catch(() => {
-        btn.textContent = '🎵';
-      });
+      ytPlayer.playVideo();
+      ytPlaying = true;
+      btn.textContent = '🎶';
+      btn.classList.add('playing');
     }
-    playing = !playing;
   });
 
-  /* 用户首次点击页面自动尝试播放 */
-  document.addEventListener('click', function autoPlay() {
-    if (!playing) {
-      audio.play().then(() => {
-        playing = true;
-        btn.textContent = '🎶';
-        btn.classList.add('playing');
-      }).catch(() => {});
+  /* 首次用户点击页面 → 取消静音并尝试播放 */
+  document.addEventListener('click', function firstClick() {
+    if (ytPlayer && ytPlayer.unMute) {
+      ytPlayer.unMute();
+      ytPlayer.setVolume(45);
     }
-    document.removeEventListener('click', autoPlay);
+    document.removeEventListener('click', firstClick);
   }, { once: true });
 </script>
 </body>
